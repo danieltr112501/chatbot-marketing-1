@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente de Marketing IA</title>
+    <!-- Incluyendo Tailwind CSS para un diseño moderno y responsivo -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilo para la fuente y la barra de desplazamiento */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .scrollbar-hidden::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hidden {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl flex flex-col h-[90vh]">
+        <!-- Encabezado del Chatbot -->
+        <header class="bg-blue-600 text-white p-4 rounded-t-2xl shadow-md flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zM2 10a8 8 0 1116 0 8 8 0 01-16 0zm10.293 2.293a1 1 0 001.414-1.414L11.414 10l2.293-2.293a1 1 0 00-1.414-1.414L10 8.586 7.707 6.293a1 1 0 00-1.414 1.414L8.586 10l-2.293 2.293a1 1 0 101.414 1.414L10 11.414l2.293 2.293z" clip-rule="evenodd" />
+            </svg>
+            <div>
+                <h1 class="text-xl font-bold">Asistente de Marketing IA</h1>
+                <p class="text-sm opacity-80">Potenciado por Inteligencia Artificial</p>
+            </div>
+        </header>
+
+        <!-- Contenedor de Mensajes -->
+        <div id="chat-container" class="flex-1 p-6 overflow-y-auto scrollbar-hidden">
+            <!-- Mensaje de bienvenida inicial -->
+            <div class="flex gap-3 my-4 text-gray-600 text-sm flex-1">
+                <div class="bg-blue-100 p-3 rounded-lg max-w-xs">
+                    <p>¡Hola! Soy tu asistente de marketing. ¿En qué puedo ayudarte hoy? Puedes preguntarme sobre estrategias de redes sociales, ideas para campañas, análisis de mercado y mucho más.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Área de Entrada de Usuario -->
+        <footer class="p-4 bg-white border-t rounded-b-2xl">
+            <form id="chat-form" class="flex items-center space-x-3">
+                <input type="text" id="user-input" placeholder="Escribe tu consulta de marketing aquí..." class="flex-1 p-3 border rounded-full focus:ring-2 focus:ring-blue-500 focus:outline-none transition duration-300">
+                <button type="submit" id="send-button" class="bg-blue-600 text-white rounded-full p-3 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-300 disabled:bg-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                </button>
+            </form>
+        </footer>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+
+        // Historial de la conversación para mantener el contexto
+        let chatHistory = [];
+
+        // Función para dar formato a la respuesta del bot (soporta markdown simple)
+        const formatBotMessage = (text) => {
+            let html = text
+                // Escapar HTML para prevenir XSS, es importante hacerlo primero
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                // Negrita (**texto**)
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // Cursiva (*texto*)
+                .replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+            // Procesar listas línea por línea para un formato correcto
+            const lines = html.split('\n');
+            let inList = null; // puede ser 'ul' o 'ol'
+            let htmlLines = [];
+
+            lines.forEach(line => {
+                const olMatch = line.match(/^(\s*)(\d+)\.\s(.*)/);
+                const ulMatch = line.match(/^(\s*)([\*-])\s(.*)/);
+
+                if (olMatch) {
+                    if (inList !== 'ol') {
+                        if (inList) htmlLines.push(`</${inList}>`); // Cerrar lista anterior
+                        htmlLines.push('<ol class="list-decimal list-inside pl-4 space-y-1">');
+                        inList = 'ol';
+                    }
+                    htmlLines.push(`<li>${olMatch[3]}</li>`);
+                } else if (ulMatch) {
+                    if (inList !== 'ul') {
+                        if (inList) htmlLines.push(`</${inList}>`); // Cerrar lista anterior
+                        htmlLines.push('<ul class="list-disc list-inside pl-4 space-y-1">');
+                        inList = 'ul';
+                    }
+                    htmlLines.push(`<li>${ulMatch[3]}</li>`);
+                } else {
+                    if (inList) {
+                        htmlLines.push(`</${inList}>`);
+                        inList = null;
+                    }
+                    htmlLines.push(line);
+                }
+            });
+
+            if (inList) {
+                htmlLines.push(`</${inList}>`);
+            }
+
+            // Unir líneas y reemplazar los saltos de línea restantes con <br>
+            // Se filtran las líneas vacías para evitar múltiples <br>
+            return htmlLines.filter(line => line.trim() !== '').join('<br>');
+        };
+
+        // Función para agregar un mensaje a la UI
+        const addMessage = (sender, message) => {
+            const messageElement = document.createElement('div');
+            messageElement.className = `flex my-4 text-sm ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            let formattedMessage;
+            if (sender === 'bot') {
+                 formattedMessage = formatBotMessage(message);
+            } else {
+                // Para mensajes de usuario, solo escapamos HTML y convertimos saltos de línea
+                formattedMessage = message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+            }
+
+            const bubbleClass = sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800';
+            
+            messageElement.innerHTML = `
+                <div class="${bubbleClass} p-3 rounded-lg max-w-md">
+                    ${formattedMessage}
+                </div>
+            `;
+            chatContainer.appendChild(messageElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        };
+
+        // Función para mostrar el indicador de "escribiendo..."
+        const showTypingIndicator = () => {
+            const typingElement = document.createElement('div');
+            typingElement.id = 'typing-indicator';
+            typingElement.className = 'flex gap-3 my-4 text-gray-600 text-sm';
+            typingElement.innerHTML = `
+                <div class="bg-gray-200 p-3 rounded-lg">
+                    <div class="flex items-center space-x-1">
+                        <span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: -0.3s;"></span>
+                        <span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style="animation-delay: -0.15s;"></span>
+                        <span class="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></span>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(typingElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        };
+
+        // Función para quitar el indicador de "escribiendo..."
+        const hideTypingIndicator = () => {
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        };
+
+        // Función para manejar el envío del formulario
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userMessage = userInput.value.trim();
+
+            if (!userMessage) return;
+
+            addMessage('user', userMessage);
+            userInput.value = '';
+            sendButton.disabled = true;
+            showTypingIndicator();
+
+            try {
+                // Actualizar historial con el mensaje del usuario
+                chatHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+
+                // Llamada a la API del asistente
+                const response = await callApi(userMessage);
+
+                hideTypingIndicator();
+                addMessage('bot', response);
+                
+                // Actualizar historial con la respuesta del bot
+                chatHistory.push({ role: 'model', parts: [{ text: response }] });
+
+            } catch (error) {
+                hideTypingIndicator();
+                console.error("Error al llamar a la API:", error);
+                addMessage('bot', 'Lo siento, ocurrió un error al procesar tu solicitud. Por favor, intenta de nuevo.');
+            } finally {
+                sendButton.disabled = false;
+                userInput.focus();
+            }
+        });
+
+        // Función para llamar a la API del Asistente
+        async function callApi(userQuery) {
+            const apiKey = ""; // La clave API no es necesaria cuando se ejecuta en el entorno de Google
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            // Instrucción del sistema para definir el rol del chatbot
+            const systemPrompt = "Actúa como un experto en marketing de clase mundial. Proporciona respuestas detalladas, estratégicas y creativas. Utiliza un tono profesional pero accesible. Basa tus respuestas en datos y tendencias actuales siempre que sea posible.";
+            
+            const payload = {
+                contents: chatHistory, // Enviamos el historial completo para mantener el contexto
+                tools: [{ "google_search": {} }], // Habilitar la búsqueda en Google para respuestas actualizadas
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`Error en la API: ${response.status} ${response.statusText} - ${errorBody}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                // Si la respuesta no tiene el formato esperado, buscar en 'promptFeedback'
+                if (result.promptFeedback && result.promptFeedback.blockReason) {
+                     console.warn("Respuesta bloqueada:", result.promptFeedback.blockReason);
+                     return `Mi política de seguridad me impide responder a esa pregunta. Razón: ${result.promptFeedback.blockReason}. Por favor, intenta con otra consulta.`;
+                }
+                console.error("Respuesta inesperada de la API:", result);
+                return "No he podido generar una respuesta en este momento.";
+            }
+        }
+    </script>
+</body>
+</html>
+
